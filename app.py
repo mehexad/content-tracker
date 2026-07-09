@@ -7,9 +7,9 @@ import smtplib
 from email.mime.text import MIMEText
 import hashlib
 
-# --- CONFIGURATION & CONSTANTS (DIRECTLY INTEGRATED) ---
+# --- CONFIGURATION & CONSTANTS ---
 APP_NAME = "Channel One Content Tracker"
-LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/c/c3/%E0%A6%9A%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%A8%E0%A7%87%E0%A6%B2_%E0%A6%93%E0%A6%AF%E0%A6%BC%E0%A6%BE%E0%A6%A8%E0%A7%87%E0%A6%B2_%E0%A6%92%E0%A6%AF%E0%A6%BC%E0%A6%BE%E0%A6%A8%E0%A7%87%E0%A6%B0_%E0%A6%B2%E0%A7%86%E0%A6%97%E0%A7%8B.svg"
+LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/c/c3/%E0%A6%9A%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%A8%E0%A7%87%E0%A6%B2_%E0%A6%93%E0%A6%AF%E0%A6%BC%E0%A6%BE%E0%A6%A8%E0%A7%87%E0%A6%B2_%E0%A6%92%E0%A6%AF%E0%A6%BC%E0%A6%BE%E0%A6%A8%E0%A7%87%E0%A6%B2_%E0%A6%B2%E0%A7%8B%E0%A6%97%E0%A7%8B.svg"
 
 # Google Sheet Details
 CONTENT_SHEET_ID = "1byGzAKrYovR29-LxtmffLMjtsIcdv3b5RXbUq4EK9VA"
@@ -57,60 +57,66 @@ if 'reg_data' not in st.session_state: st.session_state.reg_data = {}
 # --- PAGE CONFIG ---
 st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🎬")
 
-# --- CUSTOM THEME RESPONSIVE CSS (DARK & LIGHT SWITCH ACCURATE) ---
+# --- ACCURATE THEME SWITCHING CSS (RESETS BACKGROUNDS PER THEME) ---
 st.markdown(f"""
     <style>
-    /* Glossy Background Base */
-    .main {{ background-color: #0B192C; }}
-    
-    /* Dynamic Text Colors Based on User System Dark/Light Selection */
+    /* 🌙 DARK MODE STYLES */
     @media (prefers-color-scheme: dark) {{
-        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label {{
-            color: #ffc709 !important;
+        .stApp {{
+            background-color: #0B192C !important;
         }}
-        /* Input fields font color adjustment for dark mode */
-        input, select, textarea, div[data-baseweb="select"] span {{
+        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv {{
             color: #ffc709 !important;
         }}
         div[data-testid="stForm"] {{
             border: 1px solid #ffc709 !important;
-            background: linear-gradient(135deg, rgba(30, 62, 98, 0.4) 0%, rgba(11, 25, 44, 0.6) 100%);
+            background: linear-gradient(135deg, rgba(30, 62, 98, 0.4) 0%, rgba(11, 25, 44, 0.6) 100%) !important;
         }}
         .popup-box {{
-            border-left: 5px solid #ffc709;
-            background: rgba(30, 62, 98, 0.4);
+            border-left: 5px solid #ffc709 !important;
+            background: rgba(30, 62, 98, 0.4) !important;
             color: #ffc709 !important;
         }}
         .metric-card {{
-            border: 1px solid #ffc709;
-            background: linear-gradient(135deg, rgba(30, 62, 98, 0.5) 0%, rgba(11, 25, 44, 0.7) 100%);
+            border: 1px solid #ffc709 !important;
+            background: linear-gradient(135deg, rgba(30, 62, 98, 0.5) 0%, rgba(11, 25, 44, 0.7) 100%) !important;
+        }}
+        /* Sidebar dark enforcement */
+        [data-testid="stSidebar"] {{
+            background-color: #0B192C !important;
+            border-right: 1px solid #ffc709 !important;
         }}
     }}
     
+    /* ☀️ LIGHT MODE STYLES */
     @media (prefers-color-scheme: light) {{
-        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label {{
-            color: #000000 !important;
+        .stApp {{
+            background-color: #FFFFFF !important;
         }}
-        /* Input fields font color adjustment for light mode */
-        input, select, textarea, div[data-baseweb="select"] span {{
+        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv, .stRadio, div[data-baseweb="radio"] {{
             color: #000000 !important;
         }}
         div[data-testid="stForm"] {{
-            border: 1px solid #000000 !important;
-            background: #FFFFFF !important;
+            border: 2px solid #000000 !important;
+            background: #FAFAFA !important;
         }}
         .popup-box {{
-            border-left: 5px solid #000000;
-            background: #F4F6F9;
+            border-left: 5px solid #000000 !important;
+            background: #EFEFEF !important;
             color: #000000 !important;
         }}
         .metric-card {{
-            border: 1px solid #000000;
-            background: #FAFAFA;
+            border: 2px solid #000000 !important;
+            background: #F0F2F6 !important;
+        }}
+        /* Sidebar light enforcement */
+        [data-testid="stSidebar"] {{
+            background-color: #FAFAFA !important;
+            border-right: 1px solid #000000 !important;
         }}
     }}
 
-    /* Global UI Formats */
+    /* Global Structures */
     .metric-card {{
         padding: 20px; border-radius: 15px; text-align: center;
         box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 15px;
