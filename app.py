@@ -23,8 +23,8 @@ USER_SHEET_NAME = "FOR CONTENT TRACKER DETAILS"
 # Email Configuration for OTP
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = "Channelonedigitaldesk@gmail.com"
-SENDER_PASSWORD = "ldkfcrknelrbvvgz"  # <--- ⚠️ এখানে আপনার ১৬ অক্ষরের গুগল অ্যাপ পাসওয়ার্ডটি বসান (যেমন: abcd efgh ijkl mnop)
+SENDER_EMAIL = "retromedia24@gmail.com"
+SENDER_PASSWORD = "ldkf crkn elrb vvgz"  # <--- ⚠️ এখানে কোনো স্পেস ছাড়া ১৬ অক্ষরের অ্যাপ পাসওয়ার্ডটি বসান!
 
 # --- DEFAULT COLUMNS ARCHITECTURE ---
 REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploader Email", "FB", "YT", "IG", "Threads", "Dailymotion", "TikTok", "LinkedIn", "Bluesky", "Reddit"]
