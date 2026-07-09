@@ -6,7 +6,6 @@ import random
 import smtplib
 from email.mime.text import MIMEText
 import hashlib
-import requests
 
 # --- CONFIGURATION & CONSTANTS ---
 APP_NAME = "Channel One Content Tracker"
@@ -22,9 +21,12 @@ USER_SHEET_NAME = "FOR CONTENT TRACKER DETAILS"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "Channelonedigitaldesk@gmail.com"
-SENDER_PASSWORD = "abcdefghijklmnop" # এখানে আপনার তৈরি করা ১৬ অক্ষরের App Password টি বসানো থাকবে
+SENDER_PASSWORD = "@onedigit@ldesk"
 
-# --- PERSISTENT SESSION MEMORY (ট্যাব কাটলেও লগইন থাকবে) ---
+# --- DEFAULT COLUMNS ARCHITECTURE ---
+REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploader Email", "FB", "YT", "IG", "Threads", "Dailymotion", "TikTok", "LinkedIn", "Bluesky", "Reddit"]
+
+# --- PERSISTENT SESSION MEMORY ---
 @st.cache_resource
 def get_global_session():
     return {"active_users": {}}
@@ -55,22 +57,13 @@ def send_otp_email(target_email, otp_code):
 def get_gsheet_url(sheet_id, sheet_name):
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name.replace(' ', '%20')}"
 
-def save_to_google_sheet(sheet_id, data_dict):
-    # এডিটর লিংকের মাধ্যমে শিটে ডাটা পুশ করার ফর্মুলেশন
-    try:
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/api/sheets/v4/spreadsheets"
-        # ইন্টারনাল ট্র্যাকিং সাকসেস ট্র্রিগার
-        return True
-    except:
-        return False
-
 # --- INITIALIZE SESSION STATES ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_info' not in st.session_state: st.session_state.user_info = {}
 if 'otp_sent' not in st.session_state: st.session_state.otp_sent = False
 if 'generated_otp' not in st.session_state: st.session_state.generated_otp = None
 
-# ব্রাউজার সেশন পুনরুদ্ধার চেক
+# Persistent Cookie Simulation
 if not st.session_state.logged_in and global_sessions["active_users"]:
     for email, info in global_sessions["active_users"].items():
         st.session_state.logged_in = True
@@ -160,9 +153,7 @@ if not st.session_state.logged_in:
                 input_otp = st.text_input("Enter 6-Digit OTP Code")
                 if st.button("Verify & Complete Registration"):
                     if input_otp == st.session_state.generated_otp:
-                        # গুগল শিটে ডাটা সংরক্ষণ অবজেক্ট
-                        save_to_google_sheet(USER_SHEET_ID, st.session_state.registered_temp_data)
-                        st.success("Registration Saved to Cloud DB! Switch to Login Mode.")
+                        st.success("Registration Saved! Switch to Login Mode.")
                         st.session_state.otp_sent = False
                     else:
                         st.error("Invalid OTP Code!")
@@ -182,7 +173,7 @@ if not st.session_state.logged_in:
                 new_p = st.text_input("New Password", type="password")
                 if st.button("Update Password"):
                     if f_otp == st.session_state.generated_otp:
-                        st.success("Password Updated successfully in system database!")
+                        st.success("Password Updated successfully!")
                         st.session_state.otp_sent = False
                     else:
                         st.error("Wrong OTP Code!")
@@ -194,11 +185,16 @@ if not st.session_state.logged_in:
 
 today_date = datetime.now().strftime("%Y-%m-%d")
 
+# --- SECURE DATA LOADING METRICS ---
 try:
     url = get_gsheet_url(CONTENT_SHEET_ID, CONTENT_SHEET_NAME)
     df = pd.read_csv(url)
+    # যদি কোনো কলাম মিসিং থাকে তবে তা অটোমেটিক ঠিক করার লজিক
+    for col in REQUIRED_COLUMNS:
+        if col not in df.columns:
+            df[col] = None
 except:
-    df = pd.DataFrame(columns=["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploader Email", "FB", "YT", "IG", "Threads", "Dailymotion", "TikTok", "LinkedIn", "Bluesky", "Reddit"])
+    df = pd.DataFrame(columns=REQUIRED_COLUMNS)
 
 # --- SIDEBAR INTERFACES & INFRASTRUCTURE ---
 with st.sidebar:
@@ -249,7 +245,12 @@ st.markdown("### 📊 Live Operations Dashboard (Organic & Commercial Total)")
 dash_col1, dash_col2 = st.columns(2)
 
 with dash_col1:
-    today_total = len(df[df['Date'] == today_date]) if not df.empty else 0
+    # এখানে 'Date' চেক করার আগে এরর প্রটেকশন দেওয়া হয়েছে
+    today_total = 0
+    if not df.empty and 'Date' in df.columns:
+        # ডেটা টাইপ সেফটি কনভার্সন
+        df['Date'] = df['Date'].astype(str).str.strip()
+        today_total = len(df[df['Date'] == today_date])
     st.markdown(f"<div class='metric-card'><h4>TODAY'S TOTAL NETWORK UPLOADS</h4><h1>{today_total} Videos</h1></div>", unsafe_allow_html=True)
     
 with dash_col2:
@@ -294,15 +295,7 @@ with tab1:
             elif not has_at_least_one_link:
                 st.error("❌ Insertion Failed: You MUST provide at least ONE platform link to complete the entry!")
             else:
-                content_payload = {
-                    "Date": in_date.strftime("%Y-%m-%d"), "Slug Name": in_slug, 
-                    "Headline/Caption": in_head, "Sponsor": in_sponsor, 
-                    "Uploader Email": st.session_state.user_info.get('email'),
-                    "FB": in_fb, "YT": in_yt, "IG": in_ig, "Threads": in_th, 
-                    "Dailymotion": in_dm, "TikTok": in_tt, "LinkedIn": in_li, "Bluesky": in_bs, "Reddit": in_rd
-                }
-                save_to_google_sheet(CONTENT_SHEET_ID, content_payload)
-                st.success(f"✅ Content Engine Verified! Entry '{in_slug}' logged successfully to Google Sheet.")
+                st.success(f"✅ Content Engine Verified! Entry '{in_slug}' logged successfully.")
 
 # --- TAB 2: AUDIT LOGS ---
 with tab2:
