@@ -147,28 +147,33 @@ if not st.session_state.logged_in:
             if st.button("Sign In"):
                 try:
                     sheet = gc.open(USER_SHEET_NAME).sheet1
-                    user_df = pd.DataFrame(sheet.get_all_records())
-                    hashed_input_pass = hash_password(login_pass)
-                    user_df.columns = user_df.columns.str.strip()
+                    records = sheet.get_all_records()
                     
-                    matched_user = user_df[
-                        ((user_df['Username'].astype(str).str.strip() == login_id) | 
-                         (user_df['Email'].astype(str).str.strip() == login_id) | 
-                         (user_df['Phone'].astype(str).str.strip() == login_id)) & 
-                        (user_df['Password Hash'].astype(str).str.strip() == hashed_input_pass)
-                    ]
-                    
-                    if not matched_user.empty:
-                        user_name = matched_user.iloc[0]['Official Name']
-                        user_email = matched_user.iloc[0]['Email']
+                    if records:
+                        user_df = pd.DataFrame(records)
+                        user_df.columns = user_df.columns.str.strip()
+                        hashed_input_pass = hash_password(login_pass)
                         
-                        st.session_state.logged_in = True
-                        st.session_state.user_info = {"name": user_name, "email": user_email}
-                        global_sessions["active_users"][user_email] = st.session_state.user_info
-                        st.success(f"Welcome back, {user_name}! Access Granted.")
-                        st.rerun()
+                        matched_user = user_df[
+                            ((user_df['Username'].astype(str).str.strip() == login_id) | 
+                             (user_df['Email'].astype(str).str.strip() == login_id) | 
+                             (user_df['Phone'].astype(str).str.strip() == login_id)) & 
+                            (user_df['Password Hash'].astype(str).str.strip() == hashed_input_pass)
+                        ]
+                        
+                        if not matched_user.empty:
+                            user_name = matched_user.iloc[0]['Official Name']
+                            user_email = matched_user.iloc[0]['Email']
+                            
+                            st.session_state.logged_in = True
+                            st.session_state.user_info = {"name": user_name, "email": user_email}
+                            global_sessions["active_users"][user_email] = st.session_state.user_info
+                            st.success(f"Welcome back, {user_name}! Access Granted.")
+                            st.rerun()
+                        else:
+                            st.error("❌ Wrong Username or Password! Please check your credentials.")
                     else:
-                        st.error("❌ Wrong Username or Password! Please check your credentials.")
+                        st.error("❌ No users found in the database.")
                 except Exception as e:
                     if login_id == "Siam" and login_pass == "123456":
                         st.session_state.logged_in = True
@@ -199,20 +204,24 @@ if not st.session_state.logged_in:
                         st.error("Username, Email, and Phone Number are mandatory!")
                     else:
                         try:
-                            # ১. লাইভ গুগল শিট থেকে ডাটা রিড করা ভ্যালিডেশনের জন্য
                             sheet = gc.open(USER_SHEET_NAME).sheet1
-                            user_df = pd.DataFrame(sheet.get_all_records())
-                            user_df.columns = user_df.columns.str.strip()
+                            records = sheet.get_all_records()
                             
-                            # ২. চেক করা হচ্ছে এই ইউজারনেম, ইমেইল বা ফোন ইতিমধ্যে আছে কিনা
-                            is_username_exist = not user_df[user_df['Username'].astype(str).str.strip() == reg_user].empty
-                            is_email_exist = not user_df[user_df['Email'].astype(str).str.strip() == reg_email].empty
-                            is_phone_exist = not user_df[user_df['Phone'].astype(str).str.strip() == reg_phone].empty
+                            is_username_exist = False
+                            is_email_exist = False
+                            is_phone_exist = False
+                            
+                            if records:
+                                user_df = pd.DataFrame(records)
+                                user_df.columns = user_df.columns.str.strip()
+                                
+                                is_username_exist = not user_df[user_df['Username'].astype(str).str.strip() == reg_user].empty
+                                is_email_exist = not user_df[user_df['Email'].astype(str).str.strip() == reg_email].empty
+                                is_phone_exist = not user_df[user_df['Phone'].astype(str).str.strip() == reg_phone].empty
                             
                             if is_username_exist or is_email_exist or is_phone_exist:
                                 st.error("⚠️ USER EXIST, PLEASE USE UNIQUE INFO")
                             else:
-                                # ডাটা ইউনিক হলে ওটিপি জেনারেট এবং সেন্ড হবে
                                 st.session_state.generated_otp = str(random.randint(100000, 999999))
                                 st.session_state.registered_temp_data = [
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -270,10 +279,14 @@ today_date = datetime.now().strftime("%Y-%m-%d")
 
 try:
     c_sheet = gc.open(CONTENT_SHEET_NAME).sheet1
-    df = pd.DataFrame(c_sheet.get_all_records())
-    for col in REQUIRED_COLUMNS:
-        if col not in df.columns:
-            df[col] = None
+    c_records = c_sheet.get_all_records()
+    if c_records:
+        df = pd.DataFrame(c_records)
+        for col in REQUIRED_COLUMNS:
+            if col not in df.columns:
+                df[col] = None
+    else:
+        df = pd.DataFrame(columns=REQUIRED_COLUMNS)
 except:
     df = pd.DataFrame(columns=REQUIRED_COLUMNS)
 
