@@ -6,11 +6,11 @@ import random
 import smtplib
 from email.mime.text import MIMEText
 import hashlib
+from streamlit_gsheets import GSheetsConnection  # <--- গুগল শিট কানেকশন লাইব্রেরি
 
 # --- CONFIGURATION & CONSTANTS ---
 APP_NAME = "Channel One Content Tracker"
 
-# Convert Google Drive Links to Direct Images
 LOGO_URL = "https://lh3.googleusercontent.com/d/1nKDTbVEJdilkIEy7qJtorz-gxPETr0T9"
 BG_IMAGE_URL = "https://lh3.googleusercontent.com/d/1I7v-1LjLCedYP4YVZ1FpGScMAaDqEfT8"
 
@@ -23,11 +23,14 @@ USER_SHEET_NAME = "FOR CONTENT TRACKER DETAILS"
 # Email Configuration for OTP
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = "retromedia24@gmail.com"
-SENDER_PASSWORD = "ldkf crkn elrb vvgz"  # <--- ⚠️ এখানে কোনো স্পেস ছাড়া ১৬ অক্ষরের অ্যাপ পাসওয়ার্ডটি বসান!
+SENDER_EMAIL = "Channelonedigitaldesk@gmail.com"
+SENDER_PASSWORD = "abcdefghijklmnop"  # <--- এখানে আপনার স্পেস ছাড়া ১৬ অক্ষরের অ্যাপ পাসওয়ার্ডটি বসাবেন
 
-# --- DEFAULT COLUMNS ARCHITECTURE ---
 REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploader Email", "FB", "YT", "IG", "Threads", "Dailymotion", "TikTok", "LinkedIn", "Bluesky", "Reddit"]
+
+# --- INITIALIZE LIVE GSHEETS CONNECTION ---
+# এই অবজেক্টটি দিয়ে আমরা গুগল শিট রিড এবং রাইট করব
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- PERSISTENT SESSION MEMORY ---
 @st.cache_resource
@@ -57,14 +60,12 @@ def send_otp_email(target_email, otp_code):
         st.error(f"Email Dispatch Error: {e}")
         return False
 
-def get_gsheet_url(sheet_id, sheet_name):
-    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name.replace(' ', '%20')}"
-
 # --- INITIALIZE SESSION STATES ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_info' not in st.session_state: st.session_state.user_info = {}
 if 'otp_sent' not in st.session_state: st.session_state.otp_sent = False
 if 'generated_otp' not in st.session_state: st.session_state.generated_otp = None
+if 'registered_temp_data' not in st.session_state: st.session_state.registered_temp_data = None
 
 # Persistent Cookie Simulation
 if not st.session_state.logged_in and global_sessions["active_users"]:
@@ -129,8 +130,8 @@ if not st.session_state.logged_in:
             
             if st.button("Sign In"):
                 try:
-                    user_url = get_gsheet_url(USER_SHEET_ID, USER_SHEET_NAME)
-                    user_df = pd.read_csv(user_url)
+                    # সিকিউর কানেকশন দিয়ে ইউজার শিট রিড করা হচ্ছে
+                    user_df = conn.read(spreadsheet=f"https://docs.google.com/spreadsheets/d/{USER_SHEET_ID}", worksheet=USER_SHEET_NAME)
                     hashed_input_pass = hash_password(login_pass)
                     user_df.columns = user_df.columns.str.strip()
                     
@@ -160,7 +161,7 @@ if not st.session_state.logged_in:
                         st.success("Access Granted!")
                         st.rerun()
                     else:
-                        st.error("❌ Wrong Username or Password! (Database sync pending)")
+                        st.error(f"❌ Database Access Error: {e}")
                 
         elif auth_mode == "Registration":
             st.markdown("### 📝 Team Registration")
@@ -184,8 +185,12 @@ if not st.session_state.logged_in:
                         st.session_state.generated_otp = str(random.randint(100000, 999999))
                         st.session_state.registered_temp_data = {
                             "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "Official Name": reg_name, "Username": reg_user, "Office ID": reg_id,
-                            "Email": reg_email, "Phone": reg_phone, "Blood Group": reg_blood,
+                            "Official Name": reg_name, 
+                            "Username": reg_user, 
+                            "Office ID": reg_id,
+                            "Email": reg_email, 
+                            "Phone": reg_phone, 
+                            "Blood Group": reg_blood,
                             "Password Hash": hash_password(reg_p1)
                         }
                         if send_otp_email(reg_email, st.session_state.generated_otp):
@@ -196,8 +201,24 @@ if not st.session_state.logged_in:
                 input_otp = st.text_input("Enter 6-Digit OTP Code")
                 if st.button("Verify & Complete Registration"):
                     if input_otp == st.session_state.generated_otp:
-                        st.success("Registration Saved! Switch to Login Mode.")
-                        st.session_state.otp_sent = False
+                        try:
+                            # ১. বর্তমান শিটের ডাটা রিড করা
+                            user_df = conn.read(spreadsheet=f"https://docs.google.com/spreadsheets/d/{USER_SHEET_ID}", worksheet=USER_SHEET_NAME)
+                            
+                            # ২. নতুন ইউজারের ডাটা তৈরি করা
+                            new_user_row = pd.DataFrame([st.session_state.registered_temp_data])
+                            
+                            # ৩. ডাটা মার্জ/কনক্যাটিনেট করা
+                            updated_user_df = pd.concat([user_df, new_user_row], ignore_index=True)
+                            
+                            # ৪. সরাসরি গুগল শিটে রাইট (সেভ) করে দেওয়া
+                            conn.update(spreadsheet=f"https://docs.google.com/spreadsheets/d/{USER_SHEET_ID}", worksheet=USER_SHEET_NAME, data=updated_user_df)
+                            
+                            st.success("🎉 Registration Saved Directly to Google Sheets! Switch to Login Mode.")
+                            st.session_state.otp_sent = False
+                            st.session_state.registered_temp_data = None
+                        except Exception as e:
+                            st.error(f"Failed to save data to Google Sheet: {e}")
                     else:
                         st.error("Invalid OTP Code!")
                         
@@ -230,8 +251,7 @@ today_date = datetime.now().strftime("%Y-%m-%d")
 
 # --- SECURE DATA LOADING METRICS ---
 try:
-    url = get_gsheet_url(CONTENT_SHEET_ID, CONTENT_SHEET_NAME)
-    df = pd.read_csv(url)
+    df = conn.read(spreadsheet=f"https://docs.google.com/spreadsheets/d/{CONTENT_SHEET_ID}", worksheet=CONTENT_SHEET_NAME)
     for col in REQUIRED_COLUMNS:
         if col not in df.columns:
             df[col] = None
@@ -335,7 +355,20 @@ with tab1:
             elif not has_at_least_one_link:
                 st.error("❌ Insertion Failed: You MUST provide at least ONE platform link to complete the entry!")
             else:
-                st.success(f"✅ Content Engine Verified! Entry '{in_slug}' logged successfully.")
+                try:
+                    # কন্টেন্ট এন্ট্রিও গুগল শিটে লাইভ সেভ করার মেকানিজম
+                    new_content = pd.DataFrame([{
+                        "Date": str(in_date), "Slug Name": in_slug, "Headline/Caption": in_head,
+                        "Sponsor": in_sponsor, "Uploader Email": st.session_state.user_info.get('email'),
+                        "FB": in_fb, "YT": in_yt, "IG": in_ig, "Threads": in_th, "Dailymotion": in_dm,
+                        "TikTok": in_tt, "LinkedIn": in_li, "Bluesky": in_bs, "Reddit": in_rd
+                    }])
+                    updated_df = pd.concat([df, new_content], ignore_index=True)
+                    conn.update(spreadsheet=f"https://docs.google.com/spreadsheets/d/{CONTENT_SHEET_ID}", worksheet=CONTENT_SHEET_NAME, data=updated_df)
+                    st.success(f"✅ Content Engine Verified! Entry '{in_slug}' logged directly to Google Sheet.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to write content log: {e}")
 
 # --- TAB 2: AUDIT LOGS ---
 with tab2:
