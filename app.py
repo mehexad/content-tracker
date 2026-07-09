@@ -147,10 +147,11 @@ if not st.session_state.logged_in:
             if st.button("Sign In"):
                 try:
                     sheet = gc.open(USER_SHEET_NAME).sheet1
-                    records = sheet.get_all_records()
+                    data = sheet.get_all_values()
                     
-                    if records:
-                        user_df = pd.DataFrame(records)
+                    if len(data) > 1:
+                        # প্রথম লাইনকে হেডার ধরে ডেটাফ্রেম তৈরি
+                        user_df = pd.DataFrame(data[1:], columns=data[0])
                         user_df.columns = user_df.columns.str.strip()
                         hashed_input_pass = hash_password(login_pass)
                         
@@ -205,14 +206,14 @@ if not st.session_state.logged_in:
                     else:
                         try:
                             sheet = gc.open(USER_SHEET_NAME).sheet1
-                            records = sheet.get_all_records()
+                            data = sheet.get_all_values()
                             
                             is_username_exist = False
                             is_email_exist = False
                             is_phone_exist = False
                             
-                            if records:
-                                user_df = pd.DataFrame(records)
+                            if len(data) > 1:
+                                user_df = pd.DataFrame(data[1:], columns=data[0])
                                 user_df.columns = user_df.columns.str.strip()
                                 
                                 is_username_exist = not user_df[user_df['Username'].astype(str).str.strip() == reg_user].empty
@@ -279,9 +280,9 @@ today_date = datetime.now().strftime("%Y-%m-%d")
 
 try:
     c_sheet = gc.open(CONTENT_SHEET_NAME).sheet1
-    c_records = c_sheet.get_all_records()
-    if c_records:
-        df = pd.DataFrame(c_records)
+    c_data = c_sheet.get_all_values()
+    if len(c_data) > 1:
+        df = pd.DataFrame(c_data[1:], columns=c_data[0])
         for col in REQUIRED_COLUMNS:
             if col not in df.columns:
                 df[col] = None
