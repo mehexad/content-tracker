@@ -24,7 +24,7 @@ USER_SHEET_NAME = "FOR CONTENT TRACKER DETAILS"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "Channelonedigitaldesk@gmail.com"
-SENDER_PASSWORD = "@onedigit@ldesk"
+SENDER_PASSWORD = "hscr zcnu shey ijvb"  # <--- ⚠️ এখানে আপনার জিমেইলের ১৬ অক্ষরের App Password টি বসান!
 
 # --- DEFAULT COLUMNS ARCHITECTURE ---
 REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploader Email", "FB", "YT", "IG", "Threads", "Dailymotion", "TikTok", "LinkedIn", "Bluesky", "Reddit"]
@@ -129,17 +129,11 @@ if not st.session_state.logged_in:
             
             if st.button("Sign In"):
                 try:
-                    # ইউজার ডাটাবেজ শিট রিড করা হচ্ছে
                     user_url = get_gsheet_url(USER_SHEET_ID, USER_SHEET_NAME)
                     user_df = pd.read_csv(user_url)
-                    
-                    # ইনপুট পাসওয়ার্ডকে হ্যাশ করা হচ্ছে ম্যাচ করানোর জন্য
                     hashed_input_pass = hash_password(login_pass)
-                    
-                    # শিটের কলামগুলোর স্পেস ট্রিম করা
                     user_df.columns = user_df.columns.str.strip()
                     
-                    # ইউজারনেম, ইমেইল অথবা ফোনের সাথে ম্যাচিং চেক করা হচ্ছে
                     matched_user = user_df[
                         ((user_df['Username'].astype(str).str.strip() == login_id) | 
                          (user_df['Email'].astype(str).str.strip() == login_id) | 
@@ -148,7 +142,6 @@ if not st.session_state.logged_in:
                     ]
                     
                     if not matched_user.empty:
-                        # ম্যাচ করলে সেশন সাকসেসফুল লক হবে
                         user_name = matched_user.iloc[0]['Official Name']
                         user_email = matched_user.iloc[0]['Email']
                         
@@ -160,7 +153,6 @@ if not st.session_state.logged_in:
                     else:
                         st.error("❌ Wrong Username or Password! Please check your credentials.")
                 except Exception as e:
-                    # যদি গুগল শিট এখনো খালি থাকে বা কোনো ইউজার না থাকে তবে Siam অ্যাকাউন্টকে ডিফল্ট ডেমো দেওয়া হলো
                     if login_id == "Siam" and login_pass == "123456":
                         st.session_state.logged_in = True
                         st.session_state.user_info = {"name": "Siam", "email": "Siam@channelone.com"}
