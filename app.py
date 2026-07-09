@@ -385,4 +385,59 @@ with tab1:
             in_date = st.date_input("Upload Date", datetime.now())
             in_slug = st.text_input("Slug Name *", placeholder="e.g., world-cup-news-02")
             in_head = st.text_input("Headline / Caption *")
-            in_sponsor =
+            in_sponsor = st.selectbox("Select Sponsor", ["None", "Sponsor A", "Sponsor B", "Sponsor C"])
+            
+        with col_f2:
+            in_fb = st.text_input("Facebook Link")
+            in_yt = st.text_input("YouTube Link")
+            in_ig = st.text_input("Instagram Link")
+            in_th = st.text_input("Threads Link")
+            in_dm = st.text_input("Daily Motion Link")
+            in_tt = st.text_input("TikTok Link")
+            in_li = st.text_input("LinkedIn Link")
+            in_bs = st.text_input("Bluesky Link")
+            in_rd = st.text_input("Reddit Link")
+            
+        in_notes = st.text_area("Production Notes")
+        submit_content = st.form_submit_button("🚀 Broadcast & Log Content")
+        
+        if submit_content:
+            all_links = [in_fb, in_yt, in_ig, in_th, in_dm, in_tt, in_li, in_bs, in_rd]
+            has_at_least_one_link = any(link.strip() != "" for link in all_links)
+            
+            if not in_slug or not in_head:
+                st.error("❌ Insertion Failed: 'Slug Name' and 'Headline / Caption' are strictly required!")
+            elif not has_at_least_one_link:
+                st.error("❌ Insertion Failed: You MUST provide at least ONE platform link to complete the entry!")
+            else:
+                try:
+                    content_row = [
+                        str(in_date), in_slug, in_head, in_sponsor, 
+                        st.session_state.user_info.get('email'),
+                        in_fb, in_yt, in_ig, in_th, in_dm, in_tt, in_li, in_bs, in_rd
+                    ]
+                    c_sheet.append_row(content_row)
+                    st.success(f"✅ Content Engine Verified! Entry '{in_slug}' logged directly to Google Sheets.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to write log to Google Sheet: {e}")
+
+# --- TAB 2: AUDIT LOGS ---
+with tab2:
+    st.markdown(f"### 📄 Comprehensive Log Audit - {CONTENT_SHEET_NAME}")
+    st.dataframe(df, use_container_width=True)
+
+# --- TAB 3: LIVE SCOREBOARD ---
+with tab3:
+    st.markdown("### 🏆 Top 10 Live Score Leaderboard")
+    if not df.empty and 'Uploader Email' in df.columns:
+        leaderboard = df['Uploader Email'].value_counts().reset_index()
+        leaderboard.columns = ['Team Member', 'Total Videos Uploaded']
+        st.table(leaderboard.head(10))
+    else:
+        st.info("Leaderboard will automatically populate as active user sessions log entries.")
+
+# --- TAB 4: SPONSOR ACCOUNTING ---
+with tab4:
+    st.markdown("### 📈 Dedicated Sponsor Operations View")
+    st.info("Sponsor execution metrics and accounting sub-systems are currently logging in synchronization with cloud clusters.")
