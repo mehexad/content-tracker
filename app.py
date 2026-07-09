@@ -78,7 +78,6 @@ st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🎬")
 # --- CUSTOM THEME RESPONSIVE CSS (DARKER & BLURRED BACKGROUND) ---
 st.markdown(f"""
     <style>
-    /* Global Background Image with Dark Overlay & Blur Effect */
     .stApp {{
         background: linear-gradient(rgba(11, 25, 44, 0.85), rgba(0, 0, 0, 0.9)), 
                     url('{BG_IMAGE_URL}') !important;
@@ -86,60 +85,24 @@ st.markdown(f"""
         background-position: center !important;
         background-repeat: no-repeat !important;
         background-attachment: fixed !important;
-        backdrop-filter: blur(8px) !important; /* হালকা ব্লার ইফেক্ট */
+        backdrop-filter: blur(8px) !important;
         -webkit-backdrop-filter: blur(8px) !important;
     }}
     
-    /* 🌙 DARK MODE TEXT & FORM STYLES */
     @media (prefers-color-scheme: dark) {{
-        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv {{ 
-            color: #ffc709 !important; 
-        }}
-        div[data-testid="stForm"] {{ 
-            border: 1px solid #ffc709 !important; 
-            background: rgba(11, 25, 44, 0.75) !important; 
-            backdrop-filter: blur(15px);
-        }}
-        .popup-box {{ 
-            border-left: 5px solid #ffc709 !important; 
-            background: rgba(30, 62, 98, 0.6) !important; 
-            color: #ffc709 !important; 
-        }}
-        .metric-card {{ 
-            border: 1px solid #ffc709 !important; 
-            background: rgba(11, 25, 44, 0.8) !important; 
-            backdrop-filter: blur(10px);
-        }}
-        [data-testid="stSidebar"] {{ 
-            background-color: rgba(11, 25, 44, 0.95) !important; 
-            border-right: 1px solid #ffc709 !important; 
-        }}
+        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv {{ color: #ffc709 !important; }}
+        div[data-testid="stForm"] {{ border: 1px solid #ffc709 !important; background: rgba(11, 25, 44, 0.75) !important; backdrop-filter: blur(15px); }}
+        .popup-box {{ border-left: 5px solid #ffc709 !important; background: rgba(30, 62, 98, 0.6) !important; color: #ffc709 !important; }}
+        .metric-card {{ border: 1px solid #ffc709 !important; background: rgba(11, 25, 44, 0.8) !important; backdrop-filter: blur(10px); }}
+        [data-testid="stSidebar"] {{ background-color: rgba(11, 25, 44, 0.95) !important; border-right: 1px solid #ffc709 !important; }}
     }}
     
-    /* ☀️ LIGHT MODE TEXT & FORM STYLES */
     @media (prefers-color-scheme: light) {{
-        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv, .stRadio, div[data-baseweb="radio"] {{ 
-            color: #000000 !important; 
-        }}
-        div[data-testid="stForm"] {{ 
-            border: 2px solid #000000 !important; 
-            background: rgba(250, 250, 250, 0.85) !important; 
-            backdrop-filter: blur(15px);
-        }}
-        .popup-box {{ 
-            border-left: 5px solid #000000 !important; 
-            background: rgba(239, 239, 239, 0.75) !important; 
-            color: #000000 !important; 
-        }}
-        .metric-card {{ 
-            border: 2px solid #000000 !important; 
-            background: rgba(240, 242, 246, 0.85) !important; 
-            backdrop-filter: blur(10px);
-        }}
-        [data-testid="stSidebar"] {{ 
-            background-color: rgba(250, 250, 250, 0.95) !important; 
-            border-right: 1px solid #000000 !important; 
-        }}
+        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv, .stRadio, div[data-baseweb="radio"] {{ color: #000000 !important; }}
+        div[data-testid="stForm"] {{ border: 2px solid #000000 !important; background: rgba(250, 250, 250, 0.85) !important; backdrop-filter: blur(15px); }}
+        .popup-box {{ border-left: 5px solid #000000 !important; background: rgba(239, 239, 239, 0.75) !important; color: #000000 !important; }}
+        .metric-card {{ border: 2px solid #000000 !important; background: rgba(240, 242, 246, 0.85) !important; backdrop-filter: blur(10px); }}
+        [data-testid="stSidebar"] {{ background-color: rgba(250, 250, 250, 0.95) !important; border-right: 1px solid #000000 !important; }}
     }}
     
     .metric-card {{ padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 15px; }}
@@ -161,23 +124,60 @@ if not st.session_state.logged_in:
     with col_r:
         if auth_mode == "Login":
             st.markdown("### 🔐 Member Login")
-            login_id = st.text_input("Username / Email / Phone")
+            login_id = st.text_input("Username / Email / Phone").strip()
             login_pass = st.text_input("Password", type="password")
+            
             if st.button("Sign In"):
-                st.session_state.logged_in = True
-                st.session_state.user_info = {"name": "Authorized User", "email": login_id}
-                global_sessions["active_users"][login_id] = st.session_state.user_info
-                st.success("Access Granted!")
-                st.rerun()
+                try:
+                    # ইউজার ডাটাবেজ শিট রিড করা হচ্ছে
+                    user_url = get_gsheet_url(USER_SHEET_ID, USER_SHEET_NAME)
+                    user_df = pd.read_csv(user_url)
+                    
+                    # ইনপুট পাসওয়ার্ডকে হ্যাশ করা হচ্ছে ম্যাচ করানোর জন্য
+                    hashed_input_pass = hash_password(login_pass)
+                    
+                    # শিটের কলামগুলোর স্পেস ট্রিম করা
+                    user_df.columns = user_df.columns.str.strip()
+                    
+                    # ইউজারনেম, ইমেইল অথবা ফোনের সাথে ম্যাচিং চেক করা হচ্ছে
+                    matched_user = user_df[
+                        ((user_df['Username'].astype(str).str.strip() == login_id) | 
+                         (user_df['Email'].astype(str).str.strip() == login_id) | 
+                         (user_df['Phone'].astype(str).str.strip() == login_id)) & 
+                        (user_df['Password Hash'].astype(str).str.strip() == hashed_input_pass)
+                    ]
+                    
+                    if not matched_user.empty:
+                        # ম্যাচ করলে সেশন সাকসেসফুল লক হবে
+                        user_name = matched_user.iloc[0]['Official Name']
+                        user_email = matched_user.iloc[0]['Email']
+                        
+                        st.session_state.logged_in = True
+                        st.session_state.user_info = {"name": user_name, "email": user_email}
+                        global_sessions["active_users"][user_email] = st.session_state.user_info
+                        st.success(f"Welcome back, {user_name}! Access Granted.")
+                        st.rerun()
+                    else:
+                        st.error("❌ Wrong Username or Password! Please check your credentials.")
+                except Exception as e:
+                    # যদি গুগল শিট এখনো খালি থাকে বা কোনো ইউজার না থাকে তবে Siam অ্যাকাউন্টকে ডিফল্ট ডেমো দেওয়া হলো
+                    if login_id == "Siam" and login_pass == "123456":
+                        st.session_state.logged_in = True
+                        st.session_state.user_info = {"name": "Siam", "email": "Siam@channelone.com"}
+                        global_sessions["active_users"]["Siam@channelone.com"] = st.session_state.user_info
+                        st.success("Access Granted!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Wrong Username or Password! (Database sync pending)")
                 
         elif auth_mode == "Registration":
             st.markdown("### 📝 Team Registration")
             
             reg_name = st.text_input("Official Name")
-            reg_user = st.text_input("Username")
+            reg_user = st.text_input("Username").strip()
             reg_id = st.text_input("Office ID")
-            reg_email = st.text_input("Official Email")
-            reg_phone = st.text_input("Phone Number")
+            reg_email = st.text_input("Official Email").strip()
+            reg_phone = st.text_input("Phone Number").strip()
             reg_blood = st.selectbox("Blood Group", ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"])
             reg_p1 = st.text_input("Password", type="password", key="p1")
             reg_p2 = st.text_input("Confirm Password", type="password", key="p2")
