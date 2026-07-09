@@ -23,7 +23,7 @@ USER_SHEET_NAME = "FOR CONTENT TRACKER DETAILS"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "retromedia24@gmail.com"
-SENDER_PASSWORD = "volfkakauwxcobuh"  # <--- ⚠️ আপনার ১৬ অক্ষরের গুগল অ্যাপ পাসওয়ার্ড
+SENDER_PASSWORD = "volfkakauwxcobuh"  # <--- আপনার ১৬ অক্ষরের গুগল অ্যাপ পাসওয়ার্ড
 
 REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploader Email", "FB", "YT", "IG", "Threads", "Dailymotion", "TikTok", "LinkedIn", "Bluesky", "Reddit"]
 
@@ -32,18 +32,15 @@ REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploade
 def init_gspread():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # Streamlit Cloud Secrets চেক করবে
     if "gcp_service_account" in st.secrets:
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     else:
-        # লোকাল কম্পিউটারের জন্য creds.json
         creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
         
     client = gspread.authorize(creds)
     return client
 
-# গ্লোবাল ক্লায়েন্ট ইনিশিয়ালাইজেশন
 gc = None
 try:
     gc = init_gspread()
@@ -85,7 +82,6 @@ if 'otp_sent' not in st.session_state: st.session_state.otp_sent = False
 if 'generated_otp' not in st.session_state: st.session_state.generated_otp = None
 if 'registered_temp_data' not in st.session_state: st.session_state.registered_temp_data = None
 
-# Persistent Cookie Simulation
 if not st.session_state.logged_in and global_sessions["active_users"]:
     for email, info in global_sessions["active_users"].items():
         st.session_state.logged_in = True
@@ -156,7 +152,6 @@ if not st.session_state.logged_in:
                         user_df.columns = user_df.columns.str.strip()
                         hashed_input_pass = hash_password(login_pass)
                         
-                        # স্ট্রিং কনভার্সন ও ক্লিনিং জোরদার করা হয়েছে
                         user_df['Username'] = user_df['Username'].astype(str).str.strip()
                         user_df['Email'] = user_df['Email'].astype(str).str.strip()
                         user_df['Phone'] = user_df['Phone'].astype(str).str.strip()
@@ -241,8 +236,22 @@ if not st.session_state.logged_in:
                                     st.success(f"OTP Sent successfully to {reg_email}!")
                                     st.rerun()
                         except Exception as e:
-                            # এখানে রেসপন্স কোড পপ-আপ ফিক্স করা হয়েছে
-                            st.error(f"Network error during verification. Please retry. Details: {str(e)}")
+                            # 200 রেসপন্সকে এরর ট্র্যাপ থেকে বাচানোর জন্য স্ট্রিং চেক মেকানিজম
+                            err_msg = str(e)
+                            if "200" in err_msg or "Response [200]" in err_msg:
+                                # রেসপন্স ২০০ হলে গুগল শিট রেডি, তাই ওটিপি প্রসেস চালু করা হলো
+                                st.session_state.generated_otp = str(random.randint(100000, 999999))
+                                st.session_state.registered_temp_data = [
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    reg_name, reg_user, reg_id, reg_email, reg_phone, reg_blood,
+                                    hash_password(reg_p1)
+                                ]
+                                if send_otp_email(reg_email, st.session_state.generated_otp):
+                                    st.session_state.otp_sent = True
+                                    st.success(f"OTP Sent successfully to {reg_email}!")
+                                    st.rerun()
+                            else:
+                                st.error(f"Network error during verification: {err_msg}")
             else:
                 input_otp = st.text_input("Enter 6-Digit OTP Code")
                 if st.button("Verify & Complete Registration"):
@@ -302,7 +311,7 @@ try:
 except:
     df = pd.DataFrame(columns=REQUIRED_COLUMNS)
 
-# --- SIDEBAR INTERFACES & INFRASTRUCTURE ---
+# --- SIDEBAR INTERFACES ---
 with st.sidebar:
     st.image(LOGO_URL, width=110)
     st.markdown(f"🟢 **Authorized:** {st.session_state.user_info.get('email')}")
@@ -366,7 +375,7 @@ with dash_col2:
 # --- PORTAL INTERACTION TABS ---
 tab1, tab2, tab3, tab4 = st.tabs(["📥 Content Ingestion", "📋 Logs & Archives", "🏆 Team Live Score", "📈 Sponsor Deep Analytics"])
 
-# --- TAB 1: INGESTION WITH DIRECT GSHEET WRITE ---
+# --- TAB 1: INGESTION ---
 with tab1:
     st.markdown("### 📝 Smart Content Ingestion Form")
     with st.form("strict_entry_form", clear_on_submit=True):
@@ -376,59 +385,4 @@ with tab1:
             in_date = st.date_input("Upload Date", datetime.now())
             in_slug = st.text_input("Slug Name *", placeholder="e.g., world-cup-news-02")
             in_head = st.text_input("Headline / Caption *")
-            in_sponsor = st.selectbox("Select Sponsor", ["None", "Sponsor A", "Sponsor B", "Sponsor C"])
-            
-        with col_f2:
-            in_fb = st.text_input("Facebook Link")
-            in_yt = st.text_input("YouTube Link")
-            in_ig = st.text_input("Instagram Link")
-            in_th = st.text_input("Threads Link")
-            in_dm = st.text_input("Daily Motion Link")
-            in_tt = st.text_input("TikTok Link")
-            in_li = st.text_input("LinkedIn Link")
-            in_bs = st.text_input("Bluesky Link")
-            in_rd = st.text_input("Reddit Link")
-            
-        in_notes = st.text_area("Production Notes")
-        submit_content = st.form_submit_button("🚀 Broadcast & Log Content")
-        
-        if submit_content:
-            all_links = [in_fb, in_yt, in_ig, in_th, in_dm, in_tt, in_li, in_bs, in_rd]
-            has_at_least_one_link = any(link.strip() != "" for link in all_links)
-            
-            if not in_slug or not in_head:
-                st.error("❌ Insertion Failed: 'Slug Name' and 'Headline / Caption' are strictly required!")
-            elif not has_at_least_one_link:
-                st.error("❌ Insertion Failed: You MUST provide at least ONE platform link to complete the entry!")
-            else:
-                try:
-                    content_row = [
-                        str(in_date), in_slug, in_head, in_sponsor, 
-                        st.session_state.user_info.get('email'),
-                        in_fb, in_yt, in_ig, in_th, in_dm, in_tt, in_li, in_bs, in_rd
-                    ]
-                    c_sheet.append_row(content_row)
-                    st.success(f"✅ Content Engine Verified! Entry '{in_slug}' logged directly to Google Sheets.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Failed to write log to Google Sheet: {e}")
-
-# --- TAB 2: AUDIT LOGS ---
-with tab2:
-    st.markdown(f"### 📄 Comprehensive Log Audit - {CONTENT_SHEET_NAME}")
-    st.dataframe(df, use_container_width=True)
-
-# --- TAB 3: LIVE SCOREBOARD ---
-with tab3:
-    st.markdown("### 🏆 Top 10 Live Score Leaderboard")
-    if not df.empty and 'Uploader Email' in df.columns:
-        leaderboard = df['Uploader Email'].value_counts().reset_index()
-        leaderboard.columns = ['Team Member', 'Total Videos Uploaded']
-        st.table(leaderboard.head(10))
-    else:
-        st.info("Leaderboard will automatically populate as active user sessions log entries.")
-
-# --- TAB 4: SPONSOR ACCOUNTING ---
-with tab4:
-    st.markdown("### 📈 Dedicated Sponsor Operations View")
-    st.info("Sponsor execution metrics and accounting sub-systems are currently logging in synchronization with cloud clusters.")
+            in_sponsor =
