@@ -146,63 +146,53 @@ if not st.session_state.logged_in:
                 data = None
                 login_err_detail = ""
                 
-                # ট্রাই ব্লকের ভেতরে সরাসরি মেথড রান করানো এবং ফলস এরর হ্যান্ডেল করা
+                # গুগল শিট রিড করার একদম ক্লিন ও সুরক্ষিত মেকানিজম
                 try:
                     sheet = gc.open(USER_SHEET_NAME).sheet1
                     data = sheet.get_all_values()
                 except Exception as e:
                     login_err_detail = str(e)
-                    # যদি এররের ভেতরে ২০০ থাকে, তার মানে গুগল ডেটা পাঠিয়ে দিয়েছে, তাও ওটা ক্যাচ ব্লকে এসেছে
+                    # যদি এক্সেপশনে ২০০ থাকে, তবে ব্যাকএন্ড থেকে শিট অবজেক্ট রিড করার সরাসরি চেষ্টা করবে
                     if "200" in login_err_detail or "Response [200]" in login_err_detail:
                         try:
-                            # ফোর্স রি-অ্যাক্সেস ব্যাকআপ পদ্ধতি
                             sheet = gc.open(USER_SHEET_NAME).sheet1
                             data = sheet.get_all_values()
                         except:
                             pass
                 
-                # যদি সফলভাবে ডেটা লোড হয়ে থাকে (কিংবা এক্সেপশন ট্র্যাপ পার হয়ে থাকে)
-                if data is not None or ("200" in login_err_detail or "Response [200]" in login_err_detail):
+                # অবজেক্ট ভেরিফিকেশন ফেইল ঠেকাতে ডাটা চেকিং
+                if data and len(data) > 1:
                     try:
-                        if data is None:
-                            # ব্যাকআপ সেফটি: যদি অবজেক্ট এরর দেয় তাও শিট পড়ার শেষ চেষ্টা
-                            sheet = gc.open(USER_SHEET_NAME).sheet1
-                            data = sheet.get_all_values()
+                        user_df = pd.DataFrame(data[1:], columns=data[0])
+                        user_df.columns = user_df.columns.str.strip()
+                        hashed_input_pass = hash_password(login_pass)
+                        
+                        user_df['Username'] = user_df['Username'].astype(str).str.strip()
+                        user_df['Email'] = user_df['Email'].astype(str).str.strip()
+                        user_df['Phone'] = user_df['Phone'].astype(str).str.strip()
+                        user_df['Password Hash'] = user_df['Password Hash'].astype(str).str.strip()
+                        
+                        matched_user = user_df[
+                            ((user_df['Username'] == login_id) | 
+                             (user_df['Email'] == login_id) | 
+                             (user_df['Phone'] == login_id)) & 
+                            (user_df['Password Hash'] == hashed_input_pass)
+                        ]
+                        
+                        if not matched_user.empty:
+                            user_name = matched_user.iloc[0]['Official Name']
+                            user_email = matched_user.iloc[0]['Email']
                             
-                        if len(data) > 1:
-                            user_df = pd.DataFrame(data[1:], columns=data[0])
-                            user_df.columns = user_df.columns.str.strip()
-                            hashed_input_pass = hash_password(login_pass)
-                            
-                            user_df['Username'] = user_df['Username'].astype(str).str.strip()
-                            user_df['Email'] = user_df['Email'].astype(str).str.strip()
-                            user_df['Phone'] = user_df['Phone'].astype(str).str.strip()
-                            user_df['Password Hash'] = user_df['Password Hash'].astype(str).str.strip()
-                            
-                            matched_user = user_df[
-                                ((user_df['Username'] == login_id) | 
-                                 (user_df['Email'] == login_id) | 
-                                 (user_df['Phone'] == login_id)) & 
-                                (user_df['Password Hash'] == hashed_input_pass)
-                            ]
-                            
-                            if not matched_user.empty:
-                                user_name = matched_user.iloc[0]['Official Name']
-                                user_email = matched_user.iloc[0]['Email']
-                                
-                                st.session_state.logged_in = True
-                                st.session_state.user_info = {"name": user_name, "email": user_email}
-                                global_sessions["active_users"][user_email] = st.session_state.user_info
-                                st.success(f"Welcome back, {user_name}! Access Granted.")
-                                st.rerun()
-                            else:
-                                st.error("❌ Wrong Username or Password! Please check your credentials.")
+                            st.session_state.logged_in = True
+                            st.session_state.user_info = {"name": user_name, "email": user_email}
+                            global_sessions["active_users"][user_email] = st.session_state.user_info
+                            st.success(f"Welcome back, {user_name}! Access Granted.")
+                            st.rerun()
                         else:
-                            st.error("❌ No users found in the database.")
+                            st.error("❌ Wrong Username or Password! Please check your credentials.")
                     except Exception as inner_e:
-                        st.error(f"❌ Verification Logic Failure: {inner_e}")
+                        st.error(f"❌ Array Extraction Failure: {inner_e}")
                 else:
-                    # Siam এর ব্যাকডোর এন্ট্রি অপরিবর্তিত রাখা হলো
                     if login_id == "Siam" and login_pass == "123456":
                         st.session_state.logged_in = True
                         st.session_state.user_info = {"name": "Siam", "email": "siam@channelone.com"}
@@ -210,7 +200,7 @@ if not st.session_state.logged_in:
                         st.success("Access Granted via Backdoor!")
                         st.rerun()
                     else:
-                        st.error(f"❌ Database Sync Error: {login_err_detail}")
+                        st.error(f"❌ Sync Interrupted or User Sheet Empty. Details: {login_err_detail}")
                 
         elif auth_mode == "Registration":
             st.markdown("### 📝 Team Registration")
@@ -239,7 +229,7 @@ if not st.session_state.logged_in:
                             is_email_exist = False
                             is_phone_exist = False
                             
-                            if len(data) > 1:
+                            if data and len(data) > 1:
                                 user_df = pd.DataFrame(data[1:], columns=data[0])
                                 user_df.columns = user_df.columns.str.strip()
                                 
@@ -333,7 +323,7 @@ today_date = datetime.now().strftime("%Y-%m-%d")
 try:
     c_sheet = gc.open(CONTENT_SHEET_NAME).sheet1
     c_data = c_sheet.get_all_values()
-    if len(c_data) > 1:
+    if c_data and len(c_data) > 1:
         df = pd.DataFrame(c_data[1:], columns=c_data[0])
         for col in REQUIRED_COLUMNS:
             if col not in df.columns:
