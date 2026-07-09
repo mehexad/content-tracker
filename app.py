@@ -9,7 +9,10 @@ import hashlib
 
 # --- CONFIGURATION & CONSTANTS ---
 APP_NAME = "Channel One Content Tracker"
-LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/c/c3/%E0%A6%9A%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%A8%E0%A7%87%E0%A6%B2_%E0%A6%93%E0%A6%AF%E0%A6%BC%E0%A6%BE%E0%A6%A8%E0%A7%87%E0%A6%B2_%E0%A6%92%E0%A6%AF%E0%A6%BC%E0%A6%BE%E0%A6%A8%E0%A7%87%E0%A6%B2_%E0%A6%B2%E0%A7%8B%E0%A6%97%E0%A7%8B.svg"
+
+# Convert Google Drive Links to Direct Images
+LOGO_URL = "https://lh3.googleusercontent.com/d/1nKDTbVEJdilkIEy7qJtorz-gxPETr0T9"
+BG_IMAGE_URL = "https://lh3.googleusercontent.com/d/1I7v-1LjLCedYP4YVZ1FpGScMAaDqEfT8"
 
 # Google Sheet Details
 CONTENT_SHEET_ID = "1byGzAKrYovR29-LxtmffLMjtsIcdv3b5RXbUq4EK9VA"
@@ -72,26 +75,71 @@ if not st.session_state.logged_in and global_sessions["active_users"]:
 # --- PAGE CONFIG ---
 st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🎬")
 
-# --- CUSTOM THEME RESPONSIVE CSS ---
+# --- CUSTOM THEME RESPONSIVE CSS (WITH FIXED BACKGROUND IMAGE) ---
 st.markdown(f"""
     <style>
+    /* Global Background Image Integration */
+    .stApp {{
+        background-image: url('{BG_IMAGE_URL}') !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+        background-attachment: fixed !important;
+    }}
+    
+    /* 🌙 DARK MODE TEXT & FORM STYLES over BG Image */
     @media (prefers-color-scheme: dark) {{
-        .stApp {{ background-color: #0B192C !important; }}
-        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv {{ color: #ffc709 !important; }}
-        div[data-testid="stForm"] {{ border: 1px solid #ffc709 !important; background: linear-gradient(135deg, rgba(30, 62, 98, 0.4) 0%, rgba(11, 25, 44, 0.6) 100%) !important; }}
-        .popup-box {{ border-left: 5px solid #ffc709 !important; background: rgba(30, 62, 98, 0.4) !important; color: #ffc709 !important; }}
-        .metric-card {{ border: 1px solid #ffc709 !important; background: linear-gradient(135deg, rgba(30, 62, 98, 0.5) 0%, rgba(11, 25, 44, 0.7) 100%) !important; }}
-        [data-testid="stSidebar"] {{ background-color: #0B192C !important; border-right: 1px solid #ffc709 !important; }}
+        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv {{ 
+            color: #ffc709 !important; 
+        }}
+        div[data-testid="stForm"] {{ 
+            border: 1px solid #ffc709 !important; 
+            background: rgba(11, 25, 44, 0.85) !important; 
+            backdrop-filter: blur(10px);
+        }}
+        .popup-box {{ 
+            border-left: 5px solid #ffc709 !important; 
+            background: rgba(30, 62, 98, 0.7) !important; 
+            color: #ffc709 !important; 
+        }}
+        .metric-card {{ 
+            border: 1px solid #ffc709 !important; 
+            background: rgba(11, 25, 44, 0.8) !important; 
+            backdrop-filter: blur(5px);
+        }}
+        [data-testid="stSidebar"] {{ 
+            background-color: rgba(11, 25, 44, 0.95) !important; 
+            border-right: 1px solid #ffc709 !important; 
+        }}
     }}
+    
+    /* ☀️ LIGHT MODE TEXT & FORM STYLES over BG Image */
     @media (prefers-color-scheme: light) {{
-        .stApp {{ background-color: #FFFFFF !important; }}
-        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv, .stRadio, div[data-baseweb="radio"] {{ color: #000000 !important; }}
-        div[data-testid="stForm"] {{ border: 2px solid #000000 !important; background: #FAFAFA !important; }}
-        .popup-box {{ border-left: 5px solid #000000 !important; background: #EFEFEF !important; color: #000000 !important; }}
-        .metric-card {{ border: 2px solid #000000 !important; background: #F0F2F6 !important; }}
-        [data-testid="stSidebar"] {{ background-color: #FAFAFA !important; border-right: 1px solid #000000 !important; }}
+        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label, .stMarkdownDiv, .stRadio, div[data-baseweb="radio"] {{ 
+            color: #000000 !important; 
+        }}
+        div[data-testid="stForm"] {{ 
+            border: 2px solid #000000 !important; 
+            background: rgba(250, 250, 250, 0.9) !important; 
+            backdrop-filter: blur(10px);
+        }}
+        .popup-box {{ 
+            border-left: 5px solid #000000 !important; 
+            background: rgba(239, 239, 239, 0.8) !important; 
+            color: #000000 !important; 
+        }}
+        .metric-card {{ 
+            border: 2px solid #000000 !important; 
+            background: rgba(240, 242, 246, 0.9) !important; 
+            backdrop-filter: blur(5px);
+        }}
+        [data-testid="stSidebar"] {{ 
+            background-color: rgba(250, 250, 250, 0.95) !important; 
+            border-right: 1px solid #000000 !important; 
+        }}
     }}
-    .metric-card {{ padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 15px; }}
+    
+    .metric-card {{ padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); margin-bottom: 15px; }}
     .popup-box {{ border-radius: 10px; padding: 15px; margin-bottom: 12px; font-size: 0.9rem; }}
     div[data-testid="stForm"] {{ border-radius: 20px; padding: 25px; }}
     </style>
@@ -189,7 +237,6 @@ today_date = datetime.now().strftime("%Y-%m-%d")
 try:
     url = get_gsheet_url(CONTENT_SHEET_ID, CONTENT_SHEET_NAME)
     df = pd.read_csv(url)
-    # যদি কোনো কলাম মিসিং থাকে তবে তা অটোমেটিক ঠিক করার লজিক
     for col in REQUIRED_COLUMNS:
         if col not in df.columns:
             df[col] = None
@@ -245,10 +292,8 @@ st.markdown("### 📊 Live Operations Dashboard (Organic & Commercial Total)")
 dash_col1, dash_col2 = st.columns(2)
 
 with dash_col1:
-    # এখানে 'Date' চেক করার আগে এরর প্রটেকশন দেওয়া হয়েছে
     today_total = 0
     if not df.empty and 'Date' in df.columns:
-        # ডেটা টাইপ সেফটি কনভার্সন
         df['Date'] = df['Date'].astype(str).str.strip()
         today_total = len(df[df['Date'] == today_date])
     st.markdown(f"<div class='metric-card'><h4>TODAY'S TOTAL NETWORK UPLOADS</h4><h1>{today_total} Videos</h1></div>", unsafe_allow_html=True)
