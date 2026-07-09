@@ -65,7 +65,11 @@ st.markdown(f"""
     
     /* Dynamic Text Colors Based on User System Dark/Light Selection */
     @media (prefers-color-scheme: dark) {{
-        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span {{
+        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label {{
+            color: #ffc709 !important;
+        }}
+        /* Input fields font color adjustment for dark mode */
+        input, select, textarea, div[data-baseweb="select"] span {{
             color: #ffc709 !important;
         }}
         div[data-testid="stForm"] {{
@@ -84,7 +88,11 @@ st.markdown(f"""
     }}
     
     @media (prefers-color-scheme: light) {{
-        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span {{
+        html, body, [data-testid="stWidgetLabel"], p, h1, h2, h3, h4, li, span, label {{
+            color: #000000 !important;
+        }}
+        /* Input fields font color adjustment for light mode */
+        input, select, textarea, div[data-baseweb="select"] span {{
             color: #000000 !important;
         }}
         div[data-testid="stForm"] {{
