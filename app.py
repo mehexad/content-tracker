@@ -143,41 +143,66 @@ if not st.session_state.logged_in:
             login_pass = st.text_input("Password", type="password")
             
             if st.button("Sign In"):
+                data = None
+                login_err_detail = ""
+                
+                # ট্রাই ব্লকের ভেতরে সরাসরি মেথড রান করানো এবং ফলস এরর হ্যান্ডেল করা
                 try:
                     sheet = gc.open(USER_SHEET_NAME).sheet1
                     data = sheet.get_all_values()
-                    
-                    if len(data) > 1:
-                        user_df = pd.DataFrame(data[1:], columns=data[0])
-                        user_df.columns = user_df.columns.str.strip()
-                        hashed_input_pass = hash_password(login_pass)
-                        
-                        user_df['Username'] = user_df['Username'].astype(str).str.strip()
-                        user_df['Email'] = user_df['Email'].astype(str).str.strip()
-                        user_df['Phone'] = user_df['Phone'].astype(str).str.strip()
-                        user_df['Password Hash'] = user_df['Password Hash'].astype(str).str.strip()
-                        
-                        matched_user = user_df[
-                            ((user_df['Username'] == login_id) | 
-                             (user_df['Email'] == login_id) | 
-                             (user_df['Phone'] == login_id)) & 
-                            (user_df['Password Hash'] == hashed_input_pass)
-                        ]
-                        
-                        if not matched_user.empty:
-                            user_name = matched_user.iloc[0]['Official Name']
-                            user_email = matched_user.iloc[0]['Email']
-                            
-                            st.session_state.logged_in = True
-                            st.session_state.user_info = {"name": user_name, "email": user_email}
-                            global_sessions["active_users"][user_email] = st.session_state.user_info
-                            st.success(f"Welcome back, {user_name}! Access Granted.")
-                            st.rerun()
-                        else:
-                            st.error("❌ Wrong Username or Password! Please check your credentials.")
-                    else:
-                        st.error("❌ No users found in the database.")
                 except Exception as e:
+                    login_err_detail = str(e)
+                    # যদি এররের ভেতরে ২০০ থাকে, তার মানে গুগল ডেটা পাঠিয়ে দিয়েছে, তাও ওটা ক্যাচ ব্লকে এসেছে
+                    if "200" in login_err_detail or "Response [200]" in login_err_detail:
+                        try:
+                            # ফোর্স রি-অ্যাক্সেস ব্যাকআপ পদ্ধতি
+                            sheet = gc.open(USER_SHEET_NAME).sheet1
+                            data = sheet.get_all_values()
+                        except:
+                            pass
+                
+                # যদি সফলভাবে ডেটা লোড হয়ে থাকে (কিংবা এক্সেপশন ট্র্যাপ পার হয়ে থাকে)
+                if data is not None or ("200" in login_err_detail or "Response [200]" in login_err_detail):
+                    try:
+                        if data is None:
+                            # ব্যাকআপ সেফটি: যদি অবজেক্ট এরর দেয় তাও শিট পড়ার শেষ চেষ্টা
+                            sheet = gc.open(USER_SHEET_NAME).sheet1
+                            data = sheet.get_all_values()
+                            
+                        if len(data) > 1:
+                            user_df = pd.DataFrame(data[1:], columns=data[0])
+                            user_df.columns = user_df.columns.str.strip()
+                            hashed_input_pass = hash_password(login_pass)
+                            
+                            user_df['Username'] = user_df['Username'].astype(str).str.strip()
+                            user_df['Email'] = user_df['Email'].astype(str).str.strip()
+                            user_df['Phone'] = user_df['Phone'].astype(str).str.strip()
+                            user_df['Password Hash'] = user_df['Password Hash'].astype(str).str.strip()
+                            
+                            matched_user = user_df[
+                                ((user_df['Username'] == login_id) | 
+                                 (user_df['Email'] == login_id) | 
+                                 (user_df['Phone'] == login_id)) & 
+                                (user_df['Password Hash'] == hashed_input_pass)
+                            ]
+                            
+                            if not matched_user.empty:
+                                user_name = matched_user.iloc[0]['Official Name']
+                                user_email = matched_user.iloc[0]['Email']
+                                
+                                st.session_state.logged_in = True
+                                st.session_state.user_info = {"name": user_name, "email": user_email}
+                                global_sessions["active_users"][user_email] = st.session_state.user_info
+                                st.success(f"Welcome back, {user_name}! Access Granted.")
+                                st.rerun()
+                            else:
+                                st.error("❌ Wrong Username or Password! Please check your credentials.")
+                        else:
+                            st.error("❌ No users found in the database.")
+                    except Exception as inner_e:
+                        st.error(f"❌ Verification Logic Failure: {inner_e}")
+                else:
+                    # Siam এর ব্যাকডোর এন্ট্রি অপরিবর্তিত রাখা হলো
                     if login_id == "Siam" and login_pass == "123456":
                         st.session_state.logged_in = True
                         st.session_state.user_info = {"name": "Siam", "email": "siam@channelone.com"}
@@ -185,7 +210,7 @@ if not st.session_state.logged_in:
                         st.success("Access Granted via Backdoor!")
                         st.rerun()
                     else:
-                        st.error(f"❌ Database Sync Error: {e}")
+                        st.error(f"❌ Database Sync Error: {login_err_detail}")
                 
         elif auth_mode == "Registration":
             st.markdown("### 📝 Team Registration")
@@ -255,27 +280,23 @@ if not st.session_state.logged_in:
                 if st.button("Verify & Complete Registration"):
                     if input_otp == st.session_state.generated_otp:
                         
-                        # এখানে আমরা সরাসরি এক্সেপশন ট্র্যাপের বাইরে সেভ করাবো যেন Response 200 আসলেও কোড আটকে না যায়
                         registration_success = False
                         error_detail = ""
                         
                         try:
                             sheet = gc.open(USER_SHEET_NAME).sheet1
-                            response = sheet.append_row(st.session_state.registered_temp_data)
+                            sheet.append_row(st.session_state.registered_temp_data)
                             registration_success = True
                         except Exception as e:
                             error_detail = str(e)
-                            # যদি এররের ভেতরে ২০০ থাকে, তার মানে ব্যাকএন্ডে কাজ সফল হয়েছে 
                             if "200" in error_detail or "Response [200]" in error_detail or "spreadsheet" in error_detail.lower():
                                 registration_success = True
                         
                         if registration_success:
                             st.success("🎉 Registration Complete! Now Please Login.")
-                            # সেশন ক্লিনআপ
                             st.session_state.otp_sent = False
                             st.session_state.generated_otp = None
                             st.session_state.registered_temp_data = None
-                            # ইউজার যেন সাকসেস মেসেজ দেখতে পায়, তাই সরাসরি Rerun না করে ইনফর্ম করা হলো
                         else:
                             st.error(f"Failed to save data to Google Sheet: {error_detail}")
                     else:
