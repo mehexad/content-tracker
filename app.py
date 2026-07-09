@@ -20,8 +20,8 @@ USER_SHEET_NAME = "FOR CONTENT TRACKER DETAILS"
 # Email Configuration for OTP
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = "Channelonedigitaldesk@gmail.com"
-SENDER_PASSWORD = "@onedigit@ldesk"
+SENDER_EMAIL = "lholic153@gmail.com"
+SENDER_PASSWORD = "Roothtml420"
 
 # --- SYSTEM UTILITIES ---
 def hash_password(password):
