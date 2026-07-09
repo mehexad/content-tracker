@@ -6,7 +6,7 @@ import random
 import smtplib
 from email.mime.text import MIMEText
 import hashlib
-import gspread  # <--- শক্তিশালী ও স্থায়ী গুগল শিট লাইব্রেরি
+import gspread  
 from oauth2client.service_account import ServiceAccountCredentials
 
 # --- CONFIGURATION & CONSTANTS ---
@@ -23,26 +23,28 @@ USER_SHEET_NAME = "FOR CONTENT TRACKER DETAILS"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "retromedia24@gmail.com"
-SENDER_PASSWORD = "volfkakauwxcobuh"  # <--- ⚠️ এখানে আপনার স্পেস ছাড়া ১৬ অক্ষরের গুগল অ্যাপ পাসওয়ার্ডটি বসান
+SENDER_PASSWORD = "volfkakauwxcobuh"  # <--- ⚠️ আপনার ১৬ অক্ষরের গুগল অ্যাপ পাসওয়ার্ড
 
 REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploader Email", "FB", "YT", "IG", "Threads", "Dailymotion", "TikTok", "LinkedIn", "Bluesky", "Reddit"]
 
-# --- INITIALIZE GSREAD KERNEL (HYBRID AUTHENTICATION) ---
+# --- INITIALIZE GSPREAD KERNEL (HYBRID AUTHENTICATION) ---
 @st.cache_resource
 def init_gspread():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # প্রথমে চেক করবে স্ট্রীমলিট ক্লাউডের Secrets-এ ডাটা আছে কিনা (লাইভ সার্ভারের জন্য)
+    # Streamlit Cloud Secrets চেক করবে
     if "gcp_service_account" in st.secrets:
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     else:
-        # লোকাল কম্পিউটারে রান করার জন্য creds.json ফাইল খুঁজবে
+        # লোকাল কম্পিউটারের জন্য creds.json
         creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
         
     client = gspread.authorize(creds)
     return client
 
+# গ্লোবাল ক্লায়েন্ট ইনিশিয়ালাইজেশন
+gc = None
 try:
     gc = init_gspread()
 except Exception as e:
@@ -150,16 +152,21 @@ if not st.session_state.logged_in:
                     data = sheet.get_all_values()
                     
                     if len(data) > 1:
-                        # প্রথম লাইনকে হেডার ধরে ডেটাফ্রেম তৈরি
                         user_df = pd.DataFrame(data[1:], columns=data[0])
                         user_df.columns = user_df.columns.str.strip()
                         hashed_input_pass = hash_password(login_pass)
                         
+                        # স্ট্রিং কনভার্সন ও ক্লিনিং জোরদার করা হয়েছে
+                        user_df['Username'] = user_df['Username'].astype(str).str.strip()
+                        user_df['Email'] = user_df['Email'].astype(str).str.strip()
+                        user_df['Phone'] = user_df['Phone'].astype(str).str.strip()
+                        user_df['Password Hash'] = user_df['Password Hash'].astype(str).str.strip()
+                        
                         matched_user = user_df[
-                            ((user_df['Username'].astype(str).str.strip() == login_id) | 
-                             (user_df['Email'].astype(str).str.strip() == login_id) | 
-                             (user_df['Phone'].astype(str).str.strip() == login_id)) & 
-                            (user_df['Password Hash'].astype(str).str.strip() == hashed_input_pass)
+                            ((user_df['Username'] == login_id) | 
+                             (user_df['Email'] == login_id) | 
+                             (user_df['Phone'] == login_id)) & 
+                            (user_df['Password Hash'] == hashed_input_pass)
                         ]
                         
                         if not matched_user.empty:
@@ -178,8 +185,8 @@ if not st.session_state.logged_in:
                 except Exception as e:
                     if login_id == "Siam" and login_pass == "123456":
                         st.session_state.logged_in = True
-                        st.session_state.user_info = {"name": "Siam", "email": "Siam@channelone.com"}
-                        global_sessions["active_users"]["Siam@channelone.com"] = st.session_state.user_info
+                        st.session_state.user_info = {"name": "Siam", "email": "siam@channelone.com"}
+                        global_sessions["active_users"]["siam@channelone.com"] = st.session_state.user_info
                         st.success("Access Granted via Backdoor!")
                         st.rerun()
                     else:
@@ -216,8 +223,8 @@ if not st.session_state.logged_in:
                                 user_df = pd.DataFrame(data[1:], columns=data[0])
                                 user_df.columns = user_df.columns.str.strip()
                                 
-                                is_username_exist = not user_df[user_df['Username'].astype(str).str.strip() == reg_user].empty
-                                is_email_exist = not user_df[user_df['Email'].astype(str).str.strip() == reg_email].empty
+                                is_username_exist = not user_df[user_df['Username'].astype(str).str.strip().str.lower() == reg_user.lower()].empty
+                                is_email_exist = not user_df[user_df['Email'].astype(str).str.strip().str.lower() == reg_email.lower()].empty
                                 is_phone_exist = not user_df[user_df['Phone'].astype(str).str.strip() == reg_phone].empty
                             
                             if is_username_exist or is_email_exist or is_phone_exist:
@@ -234,7 +241,8 @@ if not st.session_state.logged_in:
                                     st.success(f"OTP Sent successfully to {reg_email}!")
                                     st.rerun()
                         except Exception as e:
-                            st.error(f"Validation failed during network call: {e}")
+                            # এখানে রেসপন্স কোড পপ-আপ ফিক্স করা হয়েছে
+                            st.error(f"Network error during verification. Please retry. Details: {str(e)}")
             else:
                 input_otp = st.text_input("Enter 6-Digit OTP Code")
                 if st.button("Verify & Complete Registration"):
@@ -245,7 +253,9 @@ if not st.session_state.logged_in:
                             
                             st.success("🎉 Registration Saved Directly to Google Sheets! Now you can login.")
                             st.session_state.otp_sent = False
+                            st.session_state.generated_otp = None
                             st.session_state.registered_temp_data = None
+                            st.rerun()
                         except Exception as e:
                             st.error(f"Failed to save data to Google Sheet: {e}")
                     else:
@@ -268,6 +278,7 @@ if not st.session_state.logged_in:
                     if f_otp == st.session_state.generated_otp:
                         st.success("Password Updated successfully!")
                         st.session_state.otp_sent = False
+                        st.session_state.generated_otp = None
                     else:
                         st.error("Wrong OTP Code!")
     st.stop()
@@ -299,6 +310,8 @@ with st.sidebar:
         if st.session_state.user_info.get('email') in global_sessions["active_users"]:
             del global_sessions["active_users"][st.session_state.user_info.get('email')]
         st.session_state.logged_in = False
+        st.session_state.otp_sent = False
+        st.session_state.generated_otp = None
         st.rerun()
         
     st.markdown("---")
