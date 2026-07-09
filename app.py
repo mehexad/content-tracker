@@ -46,7 +46,7 @@ def init_gspread():
 try:
     gc = init_gspread()
 except Exception as e:
-    st.error(f"🚨 Google Cloud authentication failed! \n\nলোকালে চালালে ফোল্ডারে 'creds.json' রাখুন। ক্লাউডে চালালে Streamlit Secrets সেটিংসে তথ্য যুক্ত করুন। \n\nError: {e}")
+    st.error(f"🚨 Google Cloud authentication failed! \n\nError: {e}")
 
 # --- PERSISTENT SESSION MEMORY ---
 @st.cache_resource
@@ -146,7 +146,6 @@ if not st.session_state.logged_in:
             
             if st.button("Sign In"):
                 try:
-                    # লাইভ গুগল শিট থেকে রিয়েল-টাইম ডাটা রিড করা হচ্ছে
                     sheet = gc.open(USER_SHEET_NAME).sheet1
                     user_df = pd.DataFrame(sheet.get_all_records())
                     hashed_input_pass = hash_password(login_pass)
@@ -171,7 +170,6 @@ if not st.session_state.logged_in:
                     else:
                         st.error("❌ Wrong Username or Password! Please check your credentials.")
                 except Exception as e:
-                    # এমার্জেন্সি ব্যাকডোর অ্যাক্সেস
                     if login_id == "Siam" and login_pass == "123456":
                         st.session_state.logged_in = True
                         st.session_state.user_info = {"name": "Siam", "email": "Siam@channelone.com"}
@@ -197,25 +195,41 @@ if not st.session_state.logged_in:
                 if st.button("Send Verification OTP"):
                     if reg_p1 != reg_p2:
                         st.error("Passwords do not match! Please check again.")
-                    elif not reg_email or not reg_user:
-                        st.error("Email and Username are mandatory!")
+                    elif not reg_email or not reg_user or not reg_phone:
+                        st.error("Username, Email, and Phone Number are mandatory!")
                     else:
-                        st.session_state.generated_otp = str(random.randint(100000, 999999))
-                        st.session_state.registered_temp_data = [
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            reg_name, reg_user, reg_id, reg_email, reg_phone, reg_blood,
-                            hash_password(reg_p1)
-                        ]
-                        if send_otp_email(reg_email, st.session_state.generated_otp):
-                            st.session_state.otp_sent = True
-                            st.success(f"OTP Sent successfully to {reg_email}!")
-                            st.rerun()
+                        try:
+                            # ১. লাইভ গুগল শিট থেকে ডাটা রিড করা ভ্যালিডেশনের জন্য
+                            sheet = gc.open(USER_SHEET_NAME).sheet1
+                            user_df = pd.DataFrame(sheet.get_all_records())
+                            user_df.columns = user_df.columns.str.strip()
+                            
+                            # ২. চেক করা হচ্ছে এই ইউজারনেম, ইমেইল বা ফোন ইতিমধ্যে আছে কিনা
+                            is_username_exist = not user_df[user_df['Username'].astype(str).str.strip() == reg_user].empty
+                            is_email_exist = not user_df[user_df['Email'].astype(str).str.strip() == reg_email].empty
+                            is_phone_exist = not user_df[user_df['Phone'].astype(str).str.strip() == reg_phone].empty
+                            
+                            if is_username_exist or is_email_exist or is_phone_exist:
+                                st.error("⚠️ USER EXIST, PLEASE USE UNIQUE INFO")
+                            else:
+                                # ডাটা ইউনিক হলে ওটিপি জেনারেট এবং সেন্ড হবে
+                                st.session_state.generated_otp = str(random.randint(100000, 999999))
+                                st.session_state.registered_temp_data = [
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    reg_name, reg_user, reg_id, reg_email, reg_phone, reg_blood,
+                                    hash_password(reg_p1)
+                                ]
+                                if send_otp_email(reg_email, st.session_state.generated_otp):
+                                    st.session_state.otp_sent = True
+                                    st.success(f"OTP Sent successfully to {reg_email}!")
+                                    st.rerun()
+                        except Exception as e:
+                            st.error(f"Validation failed during network call: {e}")
             else:
                 input_otp = st.text_input("Enter 6-Digit OTP Code")
                 if st.button("Verify & Complete Registration"):
                     if input_otp == st.session_state.generated_otp:
                         try:
-                            # সরাসরি গুগল শিটে ডাটা সেভ বা অ্যাপেন্ড (Append) করা হচ্ছে
                             sheet = gc.open(USER_SHEET_NAME).sheet1
                             sheet.append_row(st.session_state.registered_temp_data)
                             
@@ -254,7 +268,6 @@ if not st.session_state.logged_in:
 
 today_date = datetime.now().strftime("%Y-%m-%d")
 
-# --- SECURE DATA LOADING FROM CONTENT SHEET ---
 try:
     c_sheet = gc.open(CONTENT_SHEET_NAME).sheet1
     df = pd.DataFrame(c_sheet.get_all_records())
@@ -362,7 +375,6 @@ with tab1:
                 st.error("❌ Insertion Failed: You MUST provide at least ONE platform link to complete the entry!")
             else:
                 try:
-                    # কন্টেন্ট ডাটা গুগল শিটে অ্যাপেন্ড করা হচ্ছে
                     content_row = [
                         str(in_date), in_slug, in_head, in_sponsor, 
                         st.session_state.user_info.get('email'),
