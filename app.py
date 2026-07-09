@@ -236,10 +236,8 @@ if not st.session_state.logged_in:
                                     st.success(f"OTP Sent successfully to {reg_email}!")
                                     st.rerun()
                         except Exception as e:
-                            # 200 রেসপন্সকে এরর ট্র্যাপ থেকে বাচানোর জন্য স্ট্রিং চেক মেকানিজম
                             err_msg = str(e)
                             if "200" in err_msg or "Response [200]" in err_msg:
-                                # রেসপন্স ২০০ হলে গুগল শিট রেডি, তাই ওটিপি প্রসেস চালু করা হলো
                                 st.session_state.generated_otp = str(random.randint(100000, 999999))
                                 st.session_state.registered_temp_data = [
                                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -260,13 +258,23 @@ if not st.session_state.logged_in:
                             sheet = gc.open(USER_SHEET_NAME).sheet1
                             sheet.append_row(st.session_state.registered_temp_data)
                             
+                            # সফলভাবে সেভ হলে এখানে সাকসেস মেসেজ আসবে
                             st.success("🎉 Registration Saved Directly to Google Sheets! Now you can login.")
                             st.session_state.otp_sent = False
                             st.session_state.generated_otp = None
                             st.session_state.registered_temp_data = None
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Failed to save data to Google Sheet: {e}")
+                            save_err = str(e)
+                            # যদি গুগল এপিআই সাকসেস হওয়া সত্ত্বেও (200) এক্সেপশন থ্রো করে
+                            if "200" in save_err or "Response [200]" in save_err:
+                                st.success("🎉 Registration Saved Directly to Google Sheets! Now you can login.")
+                                st.session_state.otp_sent = False
+                                st.session_state.generated_otp = None
+                                st.session_state.registered_temp_data = None
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to save data to Google Sheet: {save_err}")
                     else:
                         st.error("Invalid OTP Code!")
                         
@@ -420,7 +428,12 @@ with tab1:
                     st.success(f"✅ Content Engine Verified! Entry '{in_slug}' logged directly to Google Sheets.")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Failed to write log to Google Sheet: {e}")
+                    ingest_err = str(e)
+                    if "200" in ingest_err or "Response [200]" in ingest_err:
+                        st.success(f"✅ Content Engine Verified! Entry '{in_slug}' logged directly to Google Sheets.")
+                        st.rerun()
+                    else:
+                        st.error(f"Failed to write log to Google Sheet: {ingest_err}")
 
 # --- TAB 2: AUDIT LOGS ---
 with tab2:
