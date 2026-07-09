@@ -24,7 +24,7 @@ USER_SHEET_NAME = "FOR CONTENT TRACKER DETAILS"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "Channelonedigitaldesk@gmail.com"
-SENDER_PASSWORD = "hscr zcnu shey ijvb"  # <--- ⚠️ এখানে আপনার জিমেইলের ১৬ অক্ষরের App Password টি বসান!
+SENDER_PASSWORD = "ldkfcrknelrbvvgz"  # <--- ⚠️ এখানে আপনার ১৬ অক্ষরের গুগল অ্যাপ পাসওয়ার্ডটি বসান (যেমন: abcd efgh ijkl mnop)
 
 # --- DEFAULT COLUMNS ARCHITECTURE ---
 REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploader Email", "FB", "YT", "IG", "Threads", "Dailymotion", "TikTok", "LinkedIn", "Bluesky", "Reddit"]
@@ -75,7 +75,7 @@ if not st.session_state.logged_in and global_sessions["active_users"]:
 # --- PAGE CONFIG ---
 st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🎬")
 
-# --- CUSTOM THEME RESPONSIVE CSS (DARKER & BLURRED BACKGROUND) ---
+# --- CUSTOM THEME RESPONSIVE CSS ---
 st.markdown(f"""
     <style>
     .stApp {{
