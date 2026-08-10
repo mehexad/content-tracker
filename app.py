@@ -6,11 +6,19 @@ import random
 import smtplib
 from email.mime.text import MIMEText
 import hashlib
+import os
+import json
 import gspread  
 from oauth2client.service_account import ServiceAccountCredentials
 
 # --- CONFIGURATION & CONSTANTS ---
 APP_NAME = "Channel One Content Tracker"
+
+def get_secret(key, default=None):
+    try:
+        return st.secrets.get(key, default)
+    except Exception:
+        return default
 
 LOGO_URL = "https://lh3.googleusercontent.com/d/1nKDTbVEJdilkIEy7qJtorz-gxPETr0T9"
 BG_IMAGE_URL = "https://lh3.googleusercontent.com/d/1I7v-1LjLCedYP4YVZ1FpGScMAaDqEfT8"
@@ -19,11 +27,15 @@ BG_IMAGE_URL = "https://lh3.googleusercontent.com/d/1I7v-1LjLCedYP4YVZ1FpGScMAaD
 CONTENT_SHEET_NAME = "2026 JULY"
 USER_SHEET_NAME = "FOR CONTENT TRACKER DETAILS"
 
-# Email Configuration for OTP
+# Email Configuration for OTP (Streamlit Secrets-এ override করা যায়)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = "retromedia24@gmail.com"
-SENDER_PASSWORD = "volfkakauwxcobuh"  # <--- আপনার ১৬ অক্ষরের গুগল অ্যাপ পাসওয়ার্ড
+SENDER_EMAIL = get_secret("smtp_email", "retromedia24@gmail.com")
+SENDER_PASSWORD = get_secret("smtp_password", "volfkakauwxcobuh")
+
+# Admin bootstrap login (সিক্রেট দিয়ে override করা যায়)
+ADMIN_USERNAME = get_secret("admin_username", "Siam")
+ADMIN_PASSWORD = get_secret("admin_password", "123456")
 
 REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploader Email", "FB", "YT", "IG", "Threads", "Dailymotion", "TikTok", "LinkedIn", "Bluesky", "Reddit"]
 
@@ -32,11 +44,18 @@ REQUIRED_COLUMNS = ["Date", "Slug Name", "Headline/Caption", "Sponsor", "Uploade
 def init_gspread():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    if "gcp_service_account" in st.secrets:
-        creds_dict = dict(st.secrets["gcp_service_account"])
+    creds_dict = get_secret("gcp_service_account")
+    if isinstance(creds_dict, str):
+        creds_dict = json.loads(creds_dict)
+    elif hasattr(creds_dict, "_dict"):
+        creds_dict = dict(creds_dict)
+        
+    if creds_dict:
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    else:
+    elif os.path.exists("creds.json"):
         creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
+    else:
+        raise RuntimeError("`gcp_service_account` secret পাওয়া যায়নি। Streamlit Cloud → Settings → Secrets-এ সেট করুন।")
         
     client = gspread.authorize(creds)
     return client
@@ -45,14 +64,9 @@ gc = None
 try:
     gc = init_gspread()
 except Exception as e:
-    st.error(f"🚨 Google Cloud authentication failed! \n\nError: {e}")
-
-# --- PERSISTENT SESSION MEMORY ---
-@st.cache_resource
-def get_global_session():
-    return {"active_users": {}}
-
-global_sessions = get_global_session()
+    st.error(f"🚨 Google Cloud authentication failed! \n\nError: {e}\n\n"
+             f"**সমাধান:** Streamlit Cloud → Settings → Secrets-এ নতুন service account-এর JSON "
+             f"`gcp_service_account` নামে বসান (নিচের নির্দেশনা দেখুন)।")
 
 # --- SYSTEM UTILITIES ---
 def hash_password(password):
@@ -81,11 +95,6 @@ if 'user_info' not in st.session_state: st.session_state.user_info = {}
 if 'otp_sent' not in st.session_state: st.session_state.otp_sent = False
 if 'generated_otp' not in st.session_state: st.session_state.generated_otp = None
 if 'registered_temp_data' not in st.session_state: st.session_state.registered_temp_data = None
-
-if not st.session_state.logged_in and global_sessions["active_users"]:
-    for email, info in global_sessions["active_users"].items():
-        st.session_state.logged_in = True
-        st.session_state.user_info = info
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🎬")
@@ -143,24 +152,28 @@ if not st.session_state.logged_in:
             login_pass = st.text_input("Password", type="password")
             
             if st.button("Sign In"):
+                # ১) Admin bootstrap check — শিট নির্বিশেষে সবসময় কাজ করবে
+                if login_id == ADMIN_USERNAME and login_pass == ADMIN_PASSWORD:
+                    st.session_state.logged_in = True
+                    st.session_state.user_info = {"name": "Siam", "email": "siam@channelone.com", "is_admin": True}
+                    st.success("Access Granted via Admin Login!")
+                    st.rerun()
+                
+                # ২) গুগল শিট-এর সাথে ভেরিফিকেশন
                 data = None
                 login_err_detail = ""
                 
-                # গুগল শিট রিড করার একদম ক্লিন ও সুরক্ষিত মেকানিজম
-                try:
-                    sheet = gc.open(USER_SHEET_NAME).sheet1
-                    data = sheet.get_all_values()
-                except Exception as e:
-                    login_err_detail = str(e)
-                    # যদি এক্সেপশনে ২০০ থাকে, তবে ব্যাকএন্ড থেকে শিট অবজেক্ট রিড করার সরাসরি চেষ্টা করবে
-                    if "200" in login_err_detail or "Response [200]" in login_err_detail:
-                        try:
-                            sheet = gc.open(USER_SHEET_NAME).sheet1
-                            data = sheet.get_all_values()
-                        except:
-                            pass
+                if gc is None:
+                    st.error("❌ Google Cloud service account working না। "
+                             "**Streamlit Cloud → Settings → Secrets**-এ নতুন `gcp_service_account` "
+                             "JSON বসান এবং শিটটি service account email-এর সাথে share করুন।")
+                else:
+                    try:
+                        sheet = gc.open(USER_SHEET_NAME).sheet1
+                        data = sheet.get_all_values()
+                    except Exception as e:
+                        login_err_detail = str(e)
                 
-                # অবজেক্ট ভেরিফিকেশন ফেইল ঠেকাতে ডাটা চেকিং
                 if data and len(data) > 1:
                     try:
                         user_df = pd.DataFrame(data[1:], columns=data[0])
@@ -185,7 +198,6 @@ if not st.session_state.logged_in:
                             
                             st.session_state.logged_in = True
                             st.session_state.user_info = {"name": user_name, "email": user_email}
-                            global_sessions["active_users"][user_email] = st.session_state.user_info
                             st.success(f"Welcome back, {user_name}! Access Granted.")
                             st.rerun()
                         else:
@@ -193,14 +205,14 @@ if not st.session_state.logged_in:
                     except Exception as inner_e:
                         st.error(f"❌ Array Extraction Failure: {inner_e}")
                 else:
-                    if login_id == "Siam" and login_pass == "123456":
-                        st.session_state.logged_in = True
-                        st.session_state.user_info = {"name": "Siam", "email": "siam@channelone.com"}
-                        global_sessions["active_users"]["siam@channelone.com"] = st.session_state.user_info
-                        st.success("Access Granted via Backdoor!")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Sync Interrupted or User Sheet Empty. Details: {login_err_detail}")
+                    st.error(
+                        f"❌ User Sheet পড়া যাচ্ছে না। Details: {login_err_detail or 'Empty sheet'}\n\n"
+                        f"**সমাধান:**\n"
+                        f"১) Service account-এর email দিয়ে শিটটি share করুন (Editor)।\n"
+                        f"২) Google Sheets API + Drive API চালু আছে কিনা দেখুন।\n"
+                        f"৩) 'gcp_service_account' secrets-এ নতুন JSON বসান।\n"
+                        f"**Admin login:** `{ADMIN_USERNAME}` / password সিক্রেট `admin_password`"
+                    )
                 
         elif auth_mode == "Registration":
             st.markdown("### 📝 Team Registration")
@@ -220,6 +232,8 @@ if not st.session_state.logged_in:
                         st.error("Passwords do not match! Please check again.")
                     elif not reg_email or not reg_user or not reg_phone:
                         st.error("Username, Email, and Phone Number are mandatory!")
+                    elif gc is None:
+                        st.error("❌ Google Cloud service account working না। আগে `gcp_service_account` secrets ঠিক করুন।")
                     else:
                         try:
                             sheet = gc.open(USER_SHEET_NAME).sheet1
@@ -330,16 +344,39 @@ try:
                 df[col] = None
     else:
         df = pd.DataFrame(columns=REQUIRED_COLUMNS)
-except:
+except Exception as _e:
     df = pd.DataFrame(columns=REQUIRED_COLUMNS)
+    sec_info = "secret missing"
+    try:
+        sc = get_secret("gcp_service_account")
+        if isinstance(sc, str):
+            sec_info = "string secret, project_id=" + json.loads(sc).get("project_id", "?")
+        elif hasattr(sc, "_dict"):
+            sec_info = "dict secret, project_id=" + dict(sc).get("project_id", "?")
+    except Exception as _se:
+        sec_info = f"secret parse error: {_se}"
+    active_email = "gc is None"
+    try:
+        if gc is not None:
+            active_email = getattr(gc.auth, "service_account_email", None) or "gc present (email unknown)"
+    except Exception:
+        pass
+    st.sidebar.warning(
+        f"⚠️ Content sheet ('{CONTENT_SHEET_NAME}') পড়া যায়নি: {_e}\n\n"
+        f"**Secrets-এ থাকা project:** `{sec_info}`\n"
+        f"**চলমান service account:** `{active_email}`"
+    )
 
 # --- SIDEBAR INTERFACES ---
 with st.sidebar:
     st.image(LOGO_URL, width=110)
     st.markdown(f"🟢 **Authorized:** {st.session_state.user_info.get('email')}")
+    try:
+        if gc is not None:
+            st.caption(f"🔧 Service Account: {gc.auth.service_account_email}")
+    except Exception:
+        pass
     if st.button("🚪 Log Out"):
-        if st.session_state.user_info.get('email') in global_sessions["active_users"]:
-            del global_sessions["active_users"][st.session_state.user_info.get('email')]
         st.session_state.logged_in = False
         st.session_state.otp_sent = False
         st.session_state.generated_otp = None
